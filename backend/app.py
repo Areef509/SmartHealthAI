@@ -28,27 +28,58 @@ def analyze_pending():
 
         report = doc.to_dict()
 
-        print("Analyzing:", doc.id)
+        print(f"Analyzing report: {doc.id}")
 
         analysis = analyze_report(report)
 
         db.collection("facilityReports").document(doc.id).update({
 
-            "aiRisk": analysis["risk"],
-            "aiSummary": analysis["summary"],
-            "aiRecommendation": analysis["recommendation"],
-            "confidence": analysis["confidence"],
+            # Existing AI Fields
+            "aiRisk": analysis.get("risk"),
+            "aiSummary": analysis.get("summary"),
+            "aiRecommendation": analysis.get("recommendation"),
+            "confidence": analysis.get("confidence"),
+
+            # NEW AI Features
+            "aiEarlyWarnings": analysis.get("earlyWarnings", []),
+
+            "aiDemandForecast": analysis.get(
+                "demandForecast",
+                {
+                    "expectedPatientIncrease": "",
+                    "medicineDemand": "",
+                    "bedDemand": ""
+                }
+            ),
+
+            "aiResourceRedistribution": analysis.get(
+                "resourceRedistribution",
+                {
+                    "priority": "",
+                    "action": ""
+                }
+            ),
+
+            "aiDistrictPriority": analysis.get(
+                "districtPriority",
+                ""
+            ),
 
             "status": "completed"
+
         })
 
         processed += 1
 
-
     return jsonify({
+        "success": True,
         "processed": processed
     })
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(
+        host="127.0.0.1",
+        port=5000,
+        debug=True
+    ) 

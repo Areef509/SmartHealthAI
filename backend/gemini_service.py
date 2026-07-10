@@ -1,79 +1,133 @@
 import os
 import json
 import time
-from pathlib import Path
 
+from dotenv import load_dotenv
 from groq import Groq
-from dotenv import dotenv_values
 
-config = dotenv_values(".env")
+load_dotenv()
 
-API_KEY = config.get("GROQ_API_KEY")
+API_KEY = os.getenv("GROQ_API_KEY")
 
 if not API_KEY:
-    raise Exception("GROQ_API_KEY not found")
+    raise Exception(
+        "GROQ_API_KEY not found. Check your backend/.env file."
+    )
 
 client = Groq(api_key=API_KEY)
 
-# Recommended model
-MODEL_NAME = "openai/gpt-oss-20b"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 
 def analyze_report(report):
 
+    report_json = json.dumps(
+        report,
+        indent=2,
+        default=str
+    )
+
     prompt = f"""
-You are an AI Healthcare Monitoring Assistant for:
+You are an AI Healthcare Monitoring Assistant for the Government of NCT of Delhi.
 
-Government of NCT of Delhi
-Department of Health & Family Welfare
-
-Your task is to analyze real-time reports submitted from:
+You monitor:
 
 - Government Hospitals
 - Community Health Centres (CHCs)
 - Primary Health Centres (PHCs)
 
-across Delhi's administrative districts.
+Analyze the following healthcare report.
 
-Analyze the following healthcare facility report:
+Healthcare Report
 
-{json.dumps(report, indent=2, default=str)}
+{report_json}
 
-Evaluate:
+Tasks
 
-1. Healthcare risk level
-2. Current operational situation
-3. Medicine availability problems
-4. Patient load pressure
-5. Bed availability
-6. Emergency response requirements
-7. Recommended government action
+1. Determine healthcare risk.
+2. Summarize the operational situation.
+3. Recommend actions.
+4. Predict medicine shortages.
+5. Forecast patient demand.
+6. Forecast medicine demand.
+7. Forecast bed demand.
+8. Recommend redistribution of medicines, beds or staff.
+9. Assign government intervention priority.
 
-Risk classification:
+Risk must be one of:
 
-Stable:
-Facility operations are normal.
-
-Attention:
-Facility needs monitoring or support.
-
-Critical:
-Immediate government intervention required.
+Stable
+Attention
+Critical
 
 Return ONLY valid JSON.
 
-{{
-    "risk": "",
-    "summary": "",
-    "recommendation": "",
-    "confidence": 0
-}}
+Required JSON fields
 
-Rules:
-- risk must be only Stable, Attention, or Critical.
-- confidence must be a number between 0 and 100.
-- summary should explain the situation clearly.
-- recommendation should contain practical healthcare actions.
+risk
+summary
+recommendation
+confidence
+earlyWarnings
+demandForecast
+resourceRedistribution
+districtPriority
+
+Requirements
+
+risk:
+Stable, Attention or Critical.
+
+confidence:
+Number between 0 and 100.
+
+earlyWarnings:
+Return an array containing 2 to 4 operational warnings.
+
+Example warnings:
+
+- IV Fluids may run out within 24 hours.
+- High patient surge expected tomorrow.
+- Low bed availability.
+- Deploy additional medical staff immediately.
+
+demandForecast:
+Return an object containing
+
+expectedPatientIncrease
+medicineDemand
+bedDemand
+
+Example values:
+
+expectedPatientIncrease = 18%
+medicineDemand = Increase by 22%
+bedDemand = Need 12 additional beds
+
+resourceRedistribution:
+
+Return an object with
+
+priority
+action
+
+Example
+
+Priority = High
+
+Action = Transfer 200 IV Fluids from Burari PHC to Rampur PHC.
+
+districtPriority:
+
+Return one value only
+
+High
+Medium
+Low
+
+Return JSON only.
+
+Do not use Markdown.
 """
 
     retries = 3
@@ -85,13 +139,15 @@ Rules:
             response = client.chat.completions.create(
                 model=MODEL_NAME,
                 temperature=0.2,
+                response_format={
+                    "type": "json_object"
+                },
                 messages=[
                     {
                         "role": "user",
                         "content": prompt
                     }
-                ],
-                response_format={"type": "json_object"}
+                ]
             )
 
             text = response.choices[0].message.content.strip()
@@ -100,18 +156,23 @@ Rules:
 
             return result
 
-        except Exception as e:
+        except Exception as error:
 
-            print(f"Groq attempt {attempt + 1} failed:", e)
+            print(
+                f"Groq attempt {attempt + 1} failed:",
+                error
+            )
 
             if attempt < retries - 1:
 
-                wait_time = (attempt + 1) * 3
+                wait = (attempt + 1) * 3
 
-                print(f"Retrying after {wait_time} seconds...")
+                print(
+                    f"Retrying after {wait} seconds..."
+                )
 
-                time.sleep(wait_time)
+                time.sleep(wait)
 
             else:
 
-                raise e
+                raise

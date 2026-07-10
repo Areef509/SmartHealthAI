@@ -1,11 +1,12 @@
+
 import { useEffect, useState } from "react";
 import { db } from "../firebase";
 
 import {
     collection,
-    getDocs,
     query,
-    orderBy
+    orderBy,
+    onSnapshot
 } from "firebase/firestore";
 
 
@@ -13,19 +14,19 @@ function AdminDashboard() {
 
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [warnings, setWarnings] = useState([]);
+    const [priorityFacilities, setPriorityFacilities] = useState([]);
 
 
-    async function loadReports() {
+    useEffect(() => {
 
-        try {
-
-            const q = query(
-                collection(db, "facilityReports"),
-                orderBy("createdAt", "desc")
-            );
+        const q = query(
+            collection(db, "facilityReports"),
+            orderBy("createdAt", "desc")
+        );
 
 
-            const snapshot = await getDocs(q);
+        const unsubscribe = onSnapshot(q, (snapshot) => {
 
 
             const data = snapshot.docs.map(doc => ({
@@ -37,26 +38,56 @@ function AdminDashboard() {
             setReports(data);
 
 
-        } catch (error) {
+            const aiWarnings = [];
 
-            console.error(
-                "Failed loading reports:",
-                error
-            );
 
-        }
-        finally {
+            data.forEach(report => {
 
+
+                if (report.aiRisk === "Critical") {
+
+                    aiWarnings.push({
+                        message:
+                            `${report.facility} has Critical Risk Alert`
+                    });
+
+                }
+
+
+                if (
+                    report.medicine?.currentStock <
+                    report.medicine?.minimumStock
+                ) {
+
+                    aiWarnings.push({
+                        message:
+                            `${report.facility} medicine stock is below minimum level`
+                    });
+
+                }
+
+
+            });
+
+
+            setWarnings(aiWarnings);
             setLoading(false);
 
-        }
+            const priority = data.filter(
+                report =>
+                    report.aiRisk === "Critical" ||
+                    report.medicine?.currentStock <
+                    report.medicine?.minimumStock ||
+                    report.availableBeds < 5
+            );
 
-    }
+            setPriorityFacilities(priority);
+
+        });
 
 
-    useEffect(() => {
+        return () => unsubscribe();
 
-        loadReports();
 
     }, []);
 
@@ -67,8 +98,10 @@ function AdminDashboard() {
         if (risk === "Critical")
             return "#dc2626";
 
+
         if (risk === "Attention")
             return "#f59e0b";
+
 
         return "#16a34a";
 
@@ -84,7 +117,9 @@ function AdminDashboard() {
                 padding: "40px",
                 fontSize: "20px"
             }}>
+
                 Loading Delhi Health Dashboard...
+
             </div>
 
         );
@@ -119,23 +154,29 @@ function AdminDashboard() {
                     🏥 Smart Health AI
                 </h1>
 
+
                 <h2>
                     Government of NCT of Delhi
                 </h2>
+
 
                 <h3>
                     Department of Health & Family Welfare
                 </h3>
 
+
                 <p>
                     Delhi District Health Monitoring Dashboard
                 </p>
+
 
                 <p>
                     Live AI Monitoring of Hospitals, CHCs and PHCs across all 13 districts
                 </p>
 
+
             </header>
+
 
 
 
@@ -151,19 +192,13 @@ function AdminDashboard() {
 
 
                 <div className="card">
-                    <h2>
-                        🏥 Facilities
-                    </h2>
-                    <h1>
-                        {reports.length}
-                    </h1>
+                    <h2>🏥 Facilities</h2>
+                    <h1>{reports.length}</h1>
                 </div>
 
 
                 <div className="card">
-                    <h2>
-                        🚨 Critical Alerts
-                    </h2>
+                    <h2>🚨 Critical Alerts</h2>
                     <h1>
                         {
                             reports.filter(
@@ -175,9 +210,7 @@ function AdminDashboard() {
 
 
                 <div className="card">
-                    <h2>
-                        🤖 AI Analysed
-                    </h2>
+                    <h2>🤖 AI Analysed</h2>
                     <h1>
                         {
                             reports.filter(
@@ -189,9 +222,7 @@ function AdminDashboard() {
 
 
                 <div className="card">
-                    <h2>
-                        💊 Medicine Issues
-                    </h2>
+                    <h2>💊 Medicine Issues</h2>
                     <h1>
                         {
                             reports.filter(
@@ -209,168 +240,467 @@ function AdminDashboard() {
 
 
 
+            <div
+                style={{
+                    background: "#fff4f4",
+                    border: "2px solid #dc2626",
+                    borderRadius: "12px",
+                    padding: "20px",
+                    marginBottom: "30px"
+                }}
+            >
+
+                <h2 style={{ color: "#dc2626" }}>
+                    🚨 Real-Time AI Early Warning Panel
+                </h2>
+
+
+                {
+                    warnings.length === 0 ?
+
+                        (
+                            <p>
+                                ✅ No active operational alerts.
+                            </p>
+                        )
+
+                        :
+
+                        warnings.map((warning, index) => (
+
+                            <div
+                                key={index}
+                                style={{
+                                    background: "white",
+                                    padding: "12px",
+                                    marginTop: "10px",
+                                    borderLeft:
+                                        "6px solid #dc2626",
+                                    borderRadius: "8px"
+                                }}
+                            >
+
+                                {warning.message}
+
+                            </div>
+
+                        ))
+
+                }
+
+
+            </div>
+            <div
+                style={{
+                    background: "#fff7ed",
+                    border: "2px solid #f97316",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    marginBottom: "30px"
+                }}
+            >
+
+                <h2>
+                    🚨 Operational Alerts Panel
+                </h2>
+
+
+                {
+                    priorityFacilities.length === 0 ?
+
+                        <p>
+                            ✅ All facilities operating normally
+                        </p>
+
+                        :
+
+                        priorityFacilities.map(
+                            facility => (
+
+                                <div
+                                    key={facility.id}
+                                    style={{
+                                        background: "white",
+                                        padding: "15px",
+                                        marginTop: "10px",
+                                        borderRadius: "8px"
+                                    }}
+                                >
+
+                                    <h3>
+                                        🏥 {facility.facility}
+                                    </h3>
+
+
+                                    <p>
+                                        Risk:
+                                        <b>
+                                            {facility.aiRisk || "Attention"}
+                                        </b>
+                                    </p>
+
+
+                                    {
+                                        facility.medicine?.currentStock <
+                                        facility.medicine?.minimumStock &&
+
+                                        <p style={{ color: "red" }}>
+                                            🔴 Medicine will run out soon
+                                        </p>
+
+                                    }
+
+
+                                    {
+                                        facility.availableBeds < 5 &&
+
+                                        <p style={{ color: "orange" }}>
+                                            ⚠️ Bed capacity shortage
+                                        </p>
+
+                                    }
+
+
+                                    {
+                                        facility.doctorPresent === false &&
+
+                                        <p style={{ color: "red" }}>
+                                            ⚠️ Doctor unavailable
+                                        </p>
+
+                                    }
+
+
+                                </div>
+
+                            )
+
+                        )
+
+                }
+
+            </div>
+
+
+
             <h2>
                 📍 Facility Intelligence Map
             </h2>
 
 
 
-            <div
-                style={{
-                    display: "grid",
-                    gap: "20px"
-                }}
-            >
+            {
+
+                reports.map(report => (
+
+                    <div
+                        key={report.id}
+                        style={{
+                            background: "white",
+                            padding: "25px",
+                            marginBottom: "20px",
+                            borderRadius: "15px",
+                            boxShadow:
+                                "0 3px 10px rgba(0,0,0,0.1)"
+                        }}
+                    >
 
 
-                {
-                    reports.map(report => (
+                        <h2>
+                            🏥 {report.facility}
+                        </h2>
 
 
-                        <div
-                            key={report.id}
+                        <p>
+                            <b>District:</b> {report.district || "Delhi"}
+                        </p>
+
+
+                        <p>
+                            <b>Health Worker:</b> {report.worker}
+                        </p>
+
+
+                        <p>
+                            <b>Patients Today:</b> {report.patientsToday}
+                        </p>
+
+
+                        <p>
+                            <b>Available Beds:</b> {report.availableBeds}
+                        </p>
+
+
+                        <p>
+                            <b>Doctor Present:</b> {report.doctorPresent}
+                        </p>
+
+
+                        <hr />
+
+
+                        <h3>
+                            💊 Medicine Status
+                        </h3>
+
+
+                        <p>
+                            {report.medicine?.name}
+                        </p>
+
+
+                        <p>
+                            Stock:
+                            {" "}
+                            {report.medicine?.currentStock}
+                            /
+                            {report.medicine?.minimumStock}
+                        </p>
+
+
+
+                        <hr />
+
+
+                        <h3>
+                            🤖 AI Analysis
+                        </h3>
+
+
+
+                        <p
                             style={{
-                                background: "white",
-                                padding: "25px",
-                                borderRadius: "15px",
-                                boxShadow:
-                                    "0 3px 10px rgba(0,0,0,0.1)"
+                                color: getRiskColor(report.aiRisk),
+                                fontSize: "20px",
+                                fontWeight: "bold"
                             }}
                         >
 
+                            Risk:
+                            {" "}
+                            {report.aiRisk || "Pending"}
 
-                            <h2>
-                                🏥 {report.facility}
-                            </h2>
-
-
-                            <p>
-                                <b>District:</b>{" "}
-                                {report.district || "Delhi"}
-                            </p>
-
-
-                            <p>
-                                <b>Health Worker:</b>{" "}
-                                {report.worker}
-                            </p>
-
-
-                            <p>
-                                <b>Patients Today:</b>{" "}
-                                {report.patientsToday}
-                            </p>
-
-
-                            <p>
-                                <b>Available Beds:</b>{" "}
-                                {report.availableBeds}
-                            </p>
-
-
-                            <p>
-                                <b>Doctor Present:</b>{" "}
-                                {report.doctorPresent}
-                            </p>
+                        </p>
 
 
 
-                            <hr />
+                        <p>
+                            <b>Summary:</b>
+                            <br />
 
+                            {
+                                report.aiSummary ||
+                                "Waiting for Gemini analysis..."
+                            }
 
-                            <h3>
-                                💊 Medicine Status
-                            </h3>
-
-
-                            <p>
-                                {report.medicine?.name}
-                            </p>
-
-
-                            <p>
-                                Stock:
-                                {" "}
-                                {report.medicine?.currentStock}
-                                /
-                                {report.medicine?.minimumStock}
-                            </p>
+                        </p>
 
 
 
-                            <hr />
+
+                        <p>
+                            <b>Recommendation:</b>
+                            <br />
+
+                            {
+                                report.aiRecommendation ||
+                                "AI recommendation pending"
+                            }
+
+                        </p>
 
 
 
-                            <h3>
-                                🤖 Gemini AI Analysis
-                            </h3>
 
-
-                            <p
-                                style={{
-                                    color: getRiskColor(
-                                        report.aiRisk
-                                    ),
-                                    fontSize: "20px",
-                                    fontWeight: "bold"
-                                }}
-                            >
-
-                                Risk:
-                                {" "}
-                                {report.aiRisk || "Pending"}
-
-                            </p>
+                        <p>
+                            Confidence:
+                            {" "}
+                            {report.confidence || 0}%
+                        </p>
 
 
 
-                            <p>
-                                <b>Summary:</b>
-                                <br />
-                                {
-                                    report.aiSummary ||
-                                    "Waiting for Gemini analysis..."
-                                }
-                            </p>
+                        <hr />
+
+
+                        <h3>
+                            🚨 AI Early Warnings
+                        </h3>
+
+                        {
+                            report.aiEarlyWarnings?.length > 0 && (
+
+                                <div
+                                    style={{
+                                        background: "#fee2e2",
+                                        border: "2px solid #dc2626",
+                                        padding: "15px",
+                                        borderRadius: "10px",
+                                        marginBottom: "15px"
+                                    }}
+                                >
+
+                                    <h4>
+                                        🔴 Critical Operational Alerts
+                                    </h4>
+
+
+                                    {
+                                        report.aiEarlyWarnings.map(
+                                            (warning, index) => (
+
+                                                <p key={index}>
+                                                    ⚠️ {warning}
+                                                </p>
+
+                                            )
+                                        )
+                                    }
+
+
+                                </div>
+
+                            )
+                        }
+
+                        {
+
+                            report.aiEarlyWarnings?.length > 0 ?
+
+                                report.aiEarlyWarnings.map(
+                                    (warning, index) => (
+
+                                        <div
+                                            key={index}
+                                            style={{
+                                                background: "#fff4f4",
+                                                borderLeft:
+                                                    "5px solid #dc2626",
+                                                padding: "10px",
+                                                marginBottom: "10px"
+                                            }}
+                                        >
+
+                                            ⚠️ {warning}
+
+                                        </div>
+
+                                    )
+
+                                )
+
+                                :
+
+                                <p>
+                                    No warnings.
+                                </p>
+
+                        }
 
 
 
-                            <p>
-                                <b>
-                                    Recommendation:
-                                </b>
-                                <br />
 
-                                {
-                                    report.aiRecommendation ||
-                                    "AI recommendation pending"
-                                }
-
-                            </p>
+                        <hr />
 
 
-
-                            <p>
-                                Confidence:
-                                {" "}
-                                {report.confidence || 0}%
-                            </p>
+                        <h3>
+                            📈 AI Demand Forecast (Next 7 Days)
+                        </h3>
 
 
-                        </div>
+                        <p>
+                            <b>Bed Demand:</b>
+                            <br />
+
+                            {
+                                report.aiDemandForecast
+                                    ?.bedDemand || "N/A"
+                            }
+
+                        </p>
+                        <hr />
+
+                        <h3>
+                            🚚 Smart Resource Redistribution
+                        </h3>
 
 
-                    ))
-                }
+                        <p>
+                            <b>Priority:</b>
+                            <br />
+
+                            {
+                                report.aiResourceRedistribution?.priority
+                                || "Pending"
+                            }
+
+                        </p>
 
 
-            </div>
+                        <p>
+                            <b>Action:</b>
+                            <br />
+
+                            {
+                                report.aiResourceRedistribution?.action
+                                || "Pending"
+                            }
+
+                        </p>
+
+
+                        <hr />
+
+
+                        <h3>
+                            🏙️ District Intervention Priority
+                        </h3>
+
+
+                        <p>
+                            {
+                                report.aiDistrictPriority
+                                || "Pending"
+                            }
+                        </p>
+
+                        <p>
+                            <b>Medicine Demand:</b>
+                            <br />
+
+                            {
+                                report.aiDemandForecast
+                                    ?.medicineDemand || "N/A"
+                            }
+
+                        </p>
+
+
+
+                        <p>
+                            <b>Bed Demand:</b>
+                            <br />
+
+                            {
+                                report.aiDemandForecast
+                                    ?.bedDemand || "N/A"
+                            }
+
+                        </p>
+
+
+                    </div>
+
+
+                ))
+
+            }
 
 
         </div>
 
     );
+
 
 }
 
