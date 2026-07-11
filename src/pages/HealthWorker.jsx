@@ -2,6 +2,7 @@ import { auth } from "../firebase";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { onAuthStateChanged } from "firebase/auth";
+import { translateText } from "../services/translate";
 import healthBg from "../assets/health-bg.jpg";
 import {
     getUserProfile,
@@ -16,6 +17,8 @@ function HealthWorker() {
     };
 
     const [profile, setProfile] = useState(null);
+
+    const [translatedProfile, setTranslatedProfile] = useState({});
 
     const [patientsToday, setPatientsToday] = useState("");
     const [availableBeds, setAvailableBeds] = useState("");
@@ -59,6 +62,38 @@ function HealthWorker() {
         return () => unsubscribe();
 
     }, []);
+
+
+    useEffect(() => {
+
+        async function translateProfile() {
+
+            if (profile) {
+
+                const lang = i18n.language;
+
+                setTranslatedProfile({
+
+                    name:
+                        await translateText(profile.name, lang),
+
+                    facility:
+                        await translateText(profile.facility, lang),
+
+                    district:
+                        await translateText(profile.district, lang),
+
+                });
+
+            }
+
+        }
+
+        translateProfile();
+
+    }, [profile, i18n.language]);
+
+
 
     async function handleSubmit() {
         if (!profile) return;
@@ -160,7 +195,7 @@ function HealthWorker() {
                     </h1>
 
                     <h2 style={{ marginTop: 10 }}>
-                        Government of NCT of Delhi
+                        {t("government")}
                     </h2>
 
                     <h3 style={{ fontWeight: "400" }}>
@@ -168,11 +203,11 @@ function HealthWorker() {
                     </h3>
 
                     <h2>
-                        Delhi District Health Reporting Portal
+                        {t("healthReportingPortal")}
                     </h2>
 
                     <p>
-                        AI Enabled Public Healthcare Monitoring System
+                        {t("aiHealthcareMonitoring")}
                     </p>
                 </div>
                 <div
@@ -188,7 +223,7 @@ function HealthWorker() {
                     }}
                 >
                     <div>🟢 {t("firebaseConnected")}</div>
-                    <div>🤖 {t("geminiActive")}</div>
+                    <div>🤖 {t("aiActive")}</div>
                     <div>⚡ {t("liveMonitoring")}</div>
                 </div>
                 <div
@@ -216,7 +251,7 @@ function HealthWorker() {
                                 marginTop: 10
                             }}
                         >
-                            {t(profile.worker || profile.name)}
+                            {translatedProfile.name || profile.name}
                         </h2>
                     </div>
 
@@ -228,14 +263,14 @@ function HealthWorker() {
                             boxShadow: "0 10px 25px rgba(21,101,192,.18)"
                         }}
                     >
-                        <h3>🏥 {t("facility")}</h3>
+                        <h3>🏥 {t("healthFacility")}</h3>
                         <h2
                             style={{
                                 color: "#0D47A1",
                                 fontSize: "28px"
                             }}
                         >
-                            {t(profile.facility)}
+                            {translatedProfile.facility || profile.facility}
                         </h2>
                     </div>
 
@@ -254,7 +289,7 @@ function HealthWorker() {
                                 fontSize: "28px"
                             }}
                         >
-                            {t(profile.district)}
+                            {translatedProfile.district || profile.district}
                         </h2>
                     </div>
 
@@ -320,7 +355,9 @@ function HealthWorker() {
                         marginBottom: "10px",
                     }}
                 >
-                    <option value="">Select Medicine</option>
+                    <option value="">
+                        {t("selectMedicine")}
+                    </option>
 
                     <option>Paracetamol</option>
                     <option>Amoxicillin</option>
@@ -426,7 +463,7 @@ function HealthWorker() {
                     🧪 {t("diagnosticTests")}
                 </h2>
 
-                <label>Select Test</label>
+                <label>{t("selectTest")}</label>
 
                 <select
                     value={testName}
@@ -459,7 +496,7 @@ function HealthWorker() {
                     <option>HIV Test</option>
                 </select>
 
-                <label>Availability Status</label>
+                <label>{t("availabilityStatus")}</label>
 
                 <select
                     value={testAvailability}
@@ -540,7 +577,7 @@ function HealthWorker() {
                 >
                     <h3>{t("government")}</h3>
 
-                    <p>Smart Health AI</p>
+                    <p>{t("smartHealth")}</p>
 
                     <p>
                         {t("poweredBy")}
